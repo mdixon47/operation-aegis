@@ -15,11 +15,55 @@ RELEASE_ROOT="${RELEASE_ROOT:-dist/staging}"
 IMAGE_NAME="${IMAGE_NAME:-project-velocity:staging}"
 CONTAINER_NAME="${CONTAINER_NAME:-project-velocity-staging-smoke}"
 CONTAINER_PORT="${CONTAINER_PORT:-8000}"
-HOST_PORT="${HOST_PORT:-18080}"
+DEFAULT_HOST_PORT=18080
+HOST_PORT_WAS_SET=false
+if [[ -n "${HOST_PORT:-}" ]]; then
+  HOST_PORT_WAS_SET=true
+else
+  HOST_PORT="$DEFAULT_HOST_PORT"
+fi
 BUILD_DOCKER_IMAGE="${BUILD_DOCKER_IMAGE:-auto}"
 RUN_CONTAINER_SMOKE_TEST="${RUN_CONTAINER_SMOKE_TEST:-auto}"
 VERSION="${GITHUB_SHA:-local}"
 DOCKER_STATUS="skipped"
+
+resolve_host_port() {
+  local requested_port="$1"
+  local explicit_port="$2"
+
+  python3 - "$requested_port" "$explicit_port" <<'PY'
+from __future__ import annotations
+
+import socket
+import sys
+
+requested_port = int(sys.argv[1])
+explicit_port = sys.argv[2] == "true"
+
+
+def is_available(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind(("0.0.0.0", port))
+        except OSError:
+            return False
+    return True
+
+
+if is_available(requested_port):
+    print(requested_port)
+elif explicit_port:
+    raise SystemExit(f"HOST_PORT {requested_port} is not available.")
+else:
+    for port in range(requested_port + 1, requested_port + 51):
+        if is_available(port):
+            print(port)
+            break
+    else:
+        raise SystemExit(f"No free host port found in range {requested_port}-{requested_port + 50}.")
+PY
+}
 
 cleanup() {
   if command -v docker >/dev/null 2>&1; then
@@ -80,6 +124,12 @@ if [[ "$should_build_docker" == true ]]; then
   DOCKER_STATUS="built"
 
   if [[ "$RUN_CONTAINER_SMOKE_TEST" != "false" ]]; then
+    RESOLVED_HOST_PORT="$(resolve_host_port "$HOST_PORT" "$HOST_PORT_WAS_SET")"
+    if [[ "$RESOLVED_HOST_PORT" != "$HOST_PORT" ]]; then
+      announce "Default host port $HOST_PORT is busy; using $RESOLVED_HOST_PORT for the smoke test"
+      HOST_PORT="$RESOLVED_HOST_PORT"
+    fi
+
     announce "Running container smoke test on http://127.0.0.1:$HOST_PORT/api/health"
     docker run -d --rm --name "$CONTAINER_NAME" -p "$HOST_PORT:$CONTAINER_PORT" "$IMAGE_NAME" >/dev/null
     export SMOKE_URL="http://127.0.0.1:$HOST_PORT/api/health"
