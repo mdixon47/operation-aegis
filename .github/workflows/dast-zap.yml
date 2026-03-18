@@ -25,7 +25,7 @@ jobs:
 
             - name: Run OWASP ZAP baseline scan
               if: ${{ vars.STAGING_URL != '' }}
-              uses: zaproxy/action-baseline@v0.14.0
+              uses: zaproxy/action-baseline@v0.15.0
               with:
                   target: ${{ vars.STAGING_URL }}
                   token: ${{ secrets.GITHUB_TOKEN }}
