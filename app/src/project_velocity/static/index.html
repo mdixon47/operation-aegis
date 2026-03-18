@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Project Velocity Dashboard</title>
+    <link rel="stylesheet" href="/dashboard.css">
+  </head>
+  <body>
+    <main class="layout">
+      <section class="hero card">
+        <p class="eyebrow">Skyline Financial Tech</p>
+        <h1>Project Velocity dashboard</h1>
+        <p id="goal"></p>
+        <div id="message" class="message"></div>
+      </section>
+
+      <section class="card form-card">
+        <h2>Quick transfer simulator</h2>
+        <form id="transfer-form">
+          <label>Source account<input name="sourceAccount" value="1001001" required></label>
+          <label>Destination account<input name="destinationAccount" value="2002002" required></label>
+          <label>Amount<input name="amount" value="25.00" required></label>
+          <label>Reference<input name="reference" value="Velocity test transfer" required></label>
+          <button type="submit">Submit transfer</button>
+        </form>
+      </section>
+
+      <section class="card"><h2>Protected accounts</h2><div id="accounts"></div></section>
+      <section class="card"><h2>Recent transfers</h2><div id="transfers"></div></section>
+      <section class="card"><h2>Recent incidents</h2><ul id="incidents"></ul></section>
+      <section class="card"><h2>Business risks</h2><ul id="risks"></ul></section>
+      <section class="card"><h2>Required GitHub checks</h2><ul id="checks"></ul></section>
+      <section class="card"><h2>Blocked-PR drills</h2><div id="drills"></div></section>
+    </main>
+    <script src="/dashboard.js"></script>
+  </body>
+</html>

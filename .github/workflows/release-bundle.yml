@@ -1,0 +1,132 @@
+name: Release Bundle
+
+on:
+    workflow_dispatch:
+        inputs:
+            ref:
+                description: Git ref to package
+                required: false
+                default: main
+            retention_days:
+                description: Artifact retention in days
+                required: false
+                type: number
+                default: 14
+            publish_release:
+                description: Publish a GitHub release after packaging
+                required: false
+                type: boolean
+                default: false
+            release_tag:
+                description: Tag to publish when using manual release mode
+                required: false
+                default: ""
+    push:
+        tags:
+            - "v*"
+
+permissions:
+    contents: write
+
+concurrency:
+    group: release-bundle-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    package-release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Determine release metadata
+              id: meta
+              env:
+                  EVENT_NAME: ${{ github.event_name }}
+                  DISPATCH_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || '' }}
+                  DISPATCH_RETENTION_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.retention_days || 14 }}
+                  DISPATCH_PUBLISH_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release || false }}
+                  DISPATCH_RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || '' }}
+                  GITHUB_REF_NAME: ${{ github.ref_name }}
+                  GITHUB_REF: ${{ github.ref }}
+                  GITHUB_SHA: ${{ github.sha }}
+              run: |
+                  set -euo pipefail
+
+                  if [[ "$EVENT_NAME" == "push" ]]; then
+                      selected_ref="$GITHUB_REF"
+                      version="$GITHUB_REF_NAME"
+                      publish_release=true
+                      tag_name="$GITHUB_REF_NAME"
+                      retention_days=30
+                  else
+                      selected_ref="${DISPATCH_REF:-main}"
+                      tag_name="$DISPATCH_RELEASE_TAG"
+                      publish_release="$DISPATCH_PUBLISH_RELEASE"
+                      retention_days="$DISPATCH_RETENTION_DAYS"
+                      short_sha="${GITHUB_SHA::7}"
+                      if [[ -n "$tag_name" ]]; then
+                          version="$tag_name"
+                      else
+                          version="manual-$short_sha"
+                      fi
+                      if [[ "$publish_release" == "true" && -z "$tag_name" ]]; then
+                          echo "release_tag is required when publish_release=true for manual runs." >&2
+                          exit 1
+                      fi
+                  fi
+
+                  artifact_name="project-velocity-${version//\//-}"
+                  release_name="Project Velocity ${version}"
+
+                  {
+                      echo "selected_ref=$selected_ref"
+                      echo "version=$version"
+                      echo "publish_release=$publish_release"
+                      echo "tag_name=$tag_name"
+                      echo "artifact_name=$artifact_name"
+                      echo "retention_days=$retention_days"
+                      echo "release_name=$release_name"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ steps.meta.outputs.selected_ref }}
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Run repository tests
+              env:
+                  CI_TEST_COMMAND: ${{ vars.CI_TEST_COMMAND }}
+              run: bash ./.github/scripts/run-tests.sh
+
+            - name: Build release bundle from staging scaffold
+              env:
+                  RELEASE_ROOT: dist/release
+                  IMAGE_NAME: project-velocity:release-bundle
+                  HOST_PORT: "18081"
+                  VERSION: ${{ steps.meta.outputs.version }}
+              run: bash ./.github/scripts/deploy-staging.sh
+
+            - name: Upload release artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ steps.meta.outputs.artifact_name }}
+                  path: dist/release
+                  retention-days: ${{ steps.meta.outputs.retention_days }}
+                  if-no-files-found: error
+
+            - name: Publish GitHub release
+              if: ${{ steps.meta.outputs.publish_release == 'true' }}
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.meta.outputs.tag_name }}
+                  name: ${{ steps.meta.outputs.release_name }}
+                  prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+                  generate_release_notes: true
+                  files: |
+                      dist/release/project-velocity-release.tgz
+                      dist/release/deployment-manifest.json
+                      dist/release/project-velocity-brief.txt

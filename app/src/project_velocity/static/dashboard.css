@@ -1,0 +1,86 @@
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  padding: 1.5rem;
+}
+
+.card {
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+}
+
+.hero {
+  grid-column: 1 / -1;
+}
+
+.eyebrow {
+  color: #38bdf8;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.message {
+  min-height: 1.5rem;
+  color: #86efac;
+}
+
+.message.error {
+  color: #fca5a5;
+}
+
+form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.95rem;
+}
+
+input,
+button {
+  border-radius: 10px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 0.7rem 0.85rem;
+}
+
+button {
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+ul,
+.stack {
+  display: grid;
+  gap: 0.65rem;
+  padding-left: 1rem;
+}
+
+.tile {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 0.8rem;
+}
+
+.meta {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}

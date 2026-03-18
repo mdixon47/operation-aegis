@@ -81,17 +81,28 @@ jobs:
               with:
                   ref: ${{ inputs.ref }}
 
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
             - name: Dry run summary
               if: ${{ inputs.dry_run }}
               run: |
                   echo "Dry run enabled: security and test gates passed; deployment command skipped." >> "$GITHUB_STEP_SUMMARY"
 
-            - name: Deployment configuration summary
+            - name: Run repository staging deployment scaffold
               if: ${{ !inputs.dry_run && vars.DEPLOY_STAGING_COMMAND == '' }}
-              run: |
-                  echo "DEPLOY_STAGING_COMMAND repository variable is not configured." >> "$GITHUB_STEP_SUMMARY"
-                  echo "Set it to your staging deploy command to activate automated deployments." >> "$GITHUB_STEP_SUMMARY"
+              run: bash ./.github/scripts/deploy-staging.sh
 
-            - name: Run staging deployment
+            - name: Run custom staging deployment
               if: ${{ !inputs.dry_run && vars.DEPLOY_STAGING_COMMAND != '' }}
               run: ${{ vars.DEPLOY_STAGING_COMMAND }}
+
+            - name: Upload staging bundle
+              if: ${{ !inputs.dry_run && hashFiles('dist/staging/**') != '' }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: staging-release-bundle
+                  path: dist/staging
+                  if-no-files-found: ignore
