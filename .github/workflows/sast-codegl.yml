@@ -31,9 +31,46 @@ jobs:
               id: detect
               run: echo "languages=$(bash ./.github/scripts/detect-codeql-languages.sh)" >> "$GITHUB_OUTPUT"
 
+    check-code-scanning:
+        runs-on: ubuntu-latest
+        outputs:
+            enabled: ${{ steps.check.outputs.enabled }}
+        permissions:
+            contents: read
+            security-events: read
+        steps:
+            - name: Check repository code scanning availability
+              id: check
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  response_file="$(mktemp)"
+                  status_code="$(curl -sS -o "$response_file" -w "%{http_code}" \
+                    -H "Authorization: Bearer $GITHUB_TOKEN" \
+                    -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/$GITHUB_REPOSITORY/code-scanning/alerts?per_page=1")"
+
+                  if [[ "$status_code" == "200" ]]; then
+                    echo "enabled=true" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+
+                  if [[ "$status_code" == "403" ]] && grep -q "Code scanning is not enabled for this repository" "$response_file"; then
+                    echo "enabled=false" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+
+                  echo "Unexpected response while checking code scanning availability (HTTP $status_code)." >&2
+                  cat "$response_file" >&2
+                  exit 1
+
     analyze:
-        needs: detect-languages
-        if: ${{ needs.detect-languages.outputs.languages != '[]' }}
+        needs:
+            - detect-languages
+            - check-code-scanning
+        if: ${{ needs.detect-languages.outputs.languages != '[]' && needs.check-code-scanning.outputs.enabled == 'true' }}
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
@@ -59,6 +96,18 @@ jobs:
 
             - name: Analyze with CodeQL
               uses: github/codeql-action/analyze@v3
+
+    code-scanning-disabled:
+        needs:
+            - detect-languages
+            - check-code-scanning
+        if: ${{ needs.detect-languages.outputs.languages != '[]' && needs.check-code-scanning.outputs.enabled != 'true' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Summarize skip
+              run: |
+                  echo "CodeQL upload skipped because GitHub code scanning is not enabled for this repository." >> "$GITHUB_STEP_SUMMARY"
+                  echo "Enable code scanning under Settings > Security > Code security and analysis to activate SARIF uploads." >> "$GITHUB_STEP_SUMMARY"
 
     no-supported-languages:
         needs: detect-languages
