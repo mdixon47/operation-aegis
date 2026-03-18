@@ -1,0 +1,31 @@
+name: DAST - ZAP Baseline
+
+on:
+    workflow_dispatch:
+    workflow_run:
+        workflows:
+            - Deploy - Staging
+        types:
+            - completed
+
+permissions:
+    contents: read
+    issues: write
+
+jobs:
+    zap-baseline:
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Skip when STAGING_URL is not configured
+              if: ${{ vars.STAGING_URL == '' }}
+              run: |
+                  echo "STAGING_URL repository variable is not configured." >> "$GITHUB_STEP_SUMMARY"
+                  echo "Configure STAGING_URL to enable automated post-deploy DAST scans." >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Run OWASP ZAP baseline scan
+              if: ${{ vars.STAGING_URL != '' }}
+              uses: zaproxy/action-baseline@v0.14.0
+              with:
+                  target: ${{ vars.STAGING_URL }}
+                  token: ${{ secrets.GITHUB_TOKEN }}

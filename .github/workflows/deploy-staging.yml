@@ -1,0 +1,97 @@
+name: Deploy - Staging
+
+on:
+    workflow_dispatch:
+        inputs:
+            ref:
+                description: Git ref to deploy
+                required: false
+                default: main
+            dry_run:
+                description: Validate controls without running the deployment command
+                required: false
+                type: boolean
+                default: false
+
+permissions:
+    contents: read
+    deployments: write
+    security-events: write
+
+concurrency:
+    group: deploy-staging
+    cancel-in-progress: false
+
+jobs:
+    pre-deploy-gate:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.ref }}
+                  fetch-depth: 0
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: lts/*
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Run repository tests
+              env:
+                  CI_TEST_COMMAND: ${{ vars.CI_TEST_COMMAND }}
+              run: bash ./.github/scripts/run-tests.sh
+
+            - name: Run Gitleaks
+              uses: gitleaks/gitleaks-action@v2
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Run Trivy config scan
+              uses: aquasecurity/trivy-action@0.28.0
+              with:
+                  scan-type: config
+                  hide-progress: true
+                  format: sarif
+                  output: trivy-config.sarif
+                  severity: CRITICAL,HIGH
+                  exit-code: "1"
+
+            - name: Upload SARIF to code scanning
+              if: always()
+              continue-on-error: true
+              uses: github/codeql-action/upload-sarif@v3
+              with:
+                  sarif_file: trivy-config.sarif
+
+    deploy:
+        needs: pre-deploy-gate
+        runs-on: ubuntu-latest
+        environment:
+            name: staging
+            url: ${{ vars.STAGING_URL }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.ref }}
+
+            - name: Dry run summary
+              if: ${{ inputs.dry_run }}
+              run: |
+                  echo "Dry run enabled: security and test gates passed; deployment command skipped." >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Deployment configuration summary
+              if: ${{ !inputs.dry_run && vars.DEPLOY_STAGING_COMMAND == '' }}
+              run: |
+                  echo "DEPLOY_STAGING_COMMAND repository variable is not configured." >> "$GITHUB_STEP_SUMMARY"
+                  echo "Set it to your staging deploy command to activate automated deployments." >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Run staging deployment
+              if: ${{ !inputs.dry_run && vars.DEPLOY_STAGING_COMMAND != '' }}
+              run: ${{ vars.DEPLOY_STAGING_COMMAND }}

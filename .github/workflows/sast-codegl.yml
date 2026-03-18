@@ -1,0 +1,69 @@
+name: SAST - CodeQL
+
+on:
+    pull_request:
+    push:
+        branches:
+            - main
+            - master
+    schedule:
+        - cron: "17 3 * * 1"
+
+permissions:
+    actions: read
+    contents: read
+    security-events: write
+
+concurrency:
+    group: codeql-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    detect-languages:
+        runs-on: ubuntu-latest
+        outputs:
+            languages: ${{ steps.detect.outputs.languages }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Detect CodeQL languages
+              id: detect
+              run: echo "languages=$(bash ./.github/scripts/detect-codeql-languages.sh)" >> "$GITHUB_OUTPUT"
+
+    analyze:
+        needs: detect-languages
+        if: ${{ needs.detect-languages.outputs.languages != '[]' }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                language: ${{ fromJSON(needs.detect-languages.outputs.languages) }}
+        permissions:
+            actions: read
+            contents: read
+            security-events: write
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v3
+              with:
+                  languages: ${{ matrix.language }}
+                  build-mode: none
+
+            - name: Autobuild project
+              if: ${{ matrix.language != 'actions' }}
+              uses: github/codeql-action/autobuild@v3
+
+            - name: Analyze with CodeQL
+              uses: github/codeql-action/analyze@v3
+
+    no-supported-languages:
+        needs: detect-languages
+        if: ${{ needs.detect-languages.outputs.languages == '[]' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Summarize skip
+              run: echo "No supported CodeQL languages detected in this repository." >> "$GITHUB_STEP_SUMMARY"
