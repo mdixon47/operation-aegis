@@ -25,7 +25,7 @@ jobs:
             languages: ${{ steps.detect.outputs.languages }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Detect CodeQL languages
               id: detect
@@ -87,7 +87,7 @@ jobs:
             security-events: write
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Initialize CodeQL
               uses: github/codeql-action/init@v3
