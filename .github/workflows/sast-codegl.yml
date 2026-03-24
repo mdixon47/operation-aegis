@@ -57,6 +57,11 @@ jobs:
                     exit 0
                   fi
 
+                  if [[ "$status_code" == "404" ]] && grep -q '"message": "no analysis found"' "$response_file"; then
+                    echo "enabled=true" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+
                   if [[ "$status_code" == "403" ]] && grep -q "Code scanning is not enabled for this repository" "$response_file"; then
                     echo "enabled=false" >> "$GITHUB_OUTPUT"
                     exit 0
