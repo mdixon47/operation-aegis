@@ -123,3 +123,7 @@ See `docs/github-ruleset-checklist.md` for a repo-specific checklist covering ru
 - `CI_TEST_COMMAND` - optional override for custom test execution
 - `DEPLOY_STAGING_COMMAND` - optional override if you want a custom staging deployment command instead of the repository scaffold
 - `STAGING_URL` - required to activate post-deploy DAST with ZAP
+
+### Read the entire story here
+
+https://mdixondev62.hashnode.dev/how-i-built-a-docker-tested-devsecops-pipeline-in-github-actions
