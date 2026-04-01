@@ -87,7 +87,7 @@ jobs:
                   } >> "$GITHUB_OUTPUT"
 
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   ref: ${{ steps.meta.outputs.selected_ref }}
                   fetch-depth: 0
