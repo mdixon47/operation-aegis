@@ -48,7 +48,7 @@ jobs:
               run: bash ./.github/scripts/run-tests.sh
 
             - name: Run Gitleaks
-              uses: gitleaks/gitleaks-action@v2
+              uses: gitleaks/gitleaks-action@v3
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
